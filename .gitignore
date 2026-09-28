@@ -1,0 +1,10 @@
+# Python analytics
+.venv/
+__pycache__/
+*.pyc
+
+outputs/
+
+*.egg-info/
+build/
+dist/
