@@ -2,7 +2,172 @@
 
 Quant Flow 的目標是從 Python 量化研究與基礎回測開始，逐步建立模擬交易、績效分析、台股策略研究，以及即時監控與交易執行流程。
 
-目前此儲存庫包含規劃文件與 Python 程式骨架，所有 `.py` 檔皆為空白。以下架構與開發階段代表預計建置的方向，尚未表示相關功能已完成；各階段工作以核取方塊追蹤。
+目前主程式已使用 phase2 帳戶回測（`account_v1`），串接資料驗證、均線訊號、委託、模擬成交、現金與整數股持倉管理。策略與買進持有基準採相同帳戶模型，並輸出逐日帳戶、逐筆成交、績效圖表及重跑設定。phase1 的向量化回測仍保留於專案內；下列開發階段同時保留長期規劃。
+
+## 執行方法（Windows PowerShell）
+
+以下指令在專案根目錄執行。先儲存修改過的檔案，再於 VS Code 開啟 PowerShell 終端機。
+
+### 第一次準備環境
+
+使用 Python 3.13 建立虛擬環境，並安裝專案及其相依套件：
+
+```powershell
+cd C:\A_TestSpring\quant-flow-docs
+py -3.13 --version
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+```
+
+如果專案放在其他位置，請替換第一行路徑。已建立可用的 Python 3.13 虛擬環境時，只需執行最後一行。
+
+開發模式安裝後，不需要設定 `PYTHONPATH`，以下指令直接使用 `.venv` 內的執行檔。修改 `.py` 後儲存即可重跑；修改 `pyproject.toml` 的相依套件或指令入口，以及重建 `.venv` 後，需重新執行安裝指令。
+
+### 執行回測
+
+預設使用 `2330.TW`、一年資料、5／20 日均線，手續費率及滑價率各為 `0.001`。策略與基準的初始現金各為 `100000`，目前固定於 `main.py`，尚無初始資金的命令列參數。主流程目前以台股日線與單一計價幣別為假設。
+
+```powershell
+.\.venv\Scripts\quant-flow.exe
+```
+
+指定股票、資料期間與均線週期：
+
+```powershell
+.\.venv\Scripts\quant-flow.exe --symbol 0050.TW --period 2y --short-window 10 --long-window 30
+```
+
+不計成本與加入成本的範例，可擇一執行：
+
+```powershell
+.\.venv\Scripts\quant-flow.exe --fee-rate 0 --slippage-rate 0
+.\.venv\Scripts\quant-flow.exe --fee-rate 0.001 --slippage-rate 0.001
+```
+
+費率以小數表示，`0.001` 代表 `0.1%`，是回測假設。週期必須符合 `0 < short-window < long-window`。資料不足以形成長均線時可能沒有交易，請選擇足夠長的期間。
+
+查看全部參數：
+
+```powershell
+.\.venv\Scripts\quant-flow.exe --help
+```
+
+原本的模組執行方式仍可使用：
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_flow.main
+```
+
+### 使用既有 CSV
+
+在 VS Code 對先前輸出的 `input_prices.csv` 按右鍵 →「複製路徑」。以下引號內是佔位文字，必須替換成實際路徑：
+
+```powershell
+.\.venv\Scripts\quant-flow.exe --symbol 2330.TW --input-csv "貼上 input_prices.csv 的完整路徑" --short-window 10 --long-window 30
+```
+
+此模式不下載資料，`--period` 不生效。`--symbol` 用於委託、持倉及報表，但程式不驗證 CSV 的股票身分，請確保兩者對應。均線與費率採命令列值或預設值，不會自動讀取舊設定。CSV 讀取器將日期轉為 UTC；帳戶回測再轉至 `Asia/Taipei`，以每筆資料日期的上午 9 點記錄開盤事件。保存的輸入日期與帳戶報表時間因此可能顯示不同時區。
+
+### 使用設定檔重跑
+
+複製先前 `config.json` 的完整路徑，替換以下佔位文字：
+
+```powershell
+.\.venv\Scripts\quant-flow.exe --config "貼上 config.json 的完整路徑"
+```
+
+設定檔會覆蓋股票、均線、費率與輸入檔參數，並停用下載期間。股價路徑以設定檔所在目錄加上 `data.file` 解析；搬移報表時，請保留整個執行資料夾。
+
+重跑需使用相同程式邏輯與相容套件環境。`pyproject.toml` 目前沒有鎖定相依套件版本。
+
+新設定檔包含 `"engine": "account_v1"` 與 `"initial_cash": "100000"`，目前這兩個欄位僅供紀錄，CLI 尚未讀取它們來切換模型或初始資金。舊 phase1 設定檔也會使用目前的帳戶模型重跑，因整數股、剩餘現金及成本計算方式不同，不能期待與舊報表相同。手動修改設定檔的 `initial_cash` 不會改變本次初始現金。
+
+### 報表與圖表
+
+每次回測建立 `outputs/<時間戳_識別碼>/`，終端機會顯示實際輸出路徑。
+
+| 檔案 | 內容 |
+| --- | --- |
+| `input_prices.csv` | 驗證及排序後、策略實際使用的股價 |
+| `strategy.csv` | 均線策略每日的目標持倉、實際股數、現金、市值與淨值 |
+| `benchmark.csv` | 買進持有基準的每日帳戶狀態 |
+| `trades.csv` | 策略逐筆成交的方向、股數、成交價、費用與現金變化 |
+| `benchmark_trades.csv` | 基準的逐筆成交紀錄 |
+| `summary.csv` | 兩組策略的累積報酬與最大回撤 |
+| `config.json` | 模型、初始現金、策略參數、資料來源與日期範圍 |
+| `equity.png` | 淨值與回撤曲線，可在 VS Code 點選預覽 |
+
+CSV 中報酬 `0.12` 代表 `12%`；最大回撤以負值表示，例如 `-0.25` 代表從先前高點回落 `25%`。
+
+每日帳戶欄位：
+
+| 欄位 | 意義 |
+| --- | --- |
+| `Date` | 台灣時間的模擬開盤時間 |
+| `Open` | 原始開盤價，尚未加上滑價 |
+| `Target` | 前一筆收盤訊號：`1` 希望持有，`0` 希望空手 |
+| `Quantity` | 處理當日交易後的實際持有股數 |
+| `Cash` | 處理當日交易與費用後的現金 |
+| `Market_Value` | 持有股數乘以當日原始開盤價 |
+| `Total_Equity` | 現金加上股票市值 |
+| `Equity` | 總資產除以初始現金，供績效分析與繪圖使用 |
+
+逐筆成交欄位為 `Symbol`、`Side`、`Quantity`、`Price`、`Gross_Amount`、`Fee`、`Cash_Change`、`Created_At`、`Executed_At`。`Side` 為 `BUY` 或 `SELL`，`Price` 已含滑價；`Fee` 僅記錄比例手續費。買入的 `Cash_Change` 為負、賣出為正。没有成交時仍會輸出欄名。
+
+可用以下關係核對策略報表，基準亦同：
+
+```text
+初始現金 + trades.csv 的 Cash_Change 加總 = 最後一列 Cash
+買入股數加總 - 賣出股數加總 = 最後一列 Quantity
+Cash + Market_Value = Total_Equity
+```
+
+成交金額以 Decimal 字串輸出；每日帳戶轉為浮點數供分析，因此核對時需容許微小的浮點誤差。`strategy.csv` 不再包含 phase1 的逐日報酬欄位；`Target` 是當日使用的前一筆訊號，不是當天收盤的新訊號。
+
+彙整所有既有結果：
+
+```powershell
+.\.venv\Scripts\quant-flow-compare.exe
+```
+
+結果寫入 `outputs/comparison.csv`，再次彙整會覆寫這張表，不會修改各次回測資料夾。比較均線參數時，請使用相同股價資料與費率；相同日期範圍及筆數不保證價格完全相同。
+
+目前比較工具尚未依 `engine` 與 `initial_cash` 區分結果，也未將這兩欄加入比較表。請檢查各次設定檔，避免把 phase1 與 phase2 報表視為相同模型的結果。
+
+### 執行測試
+
+執行全部測試：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s src/quant_flow/tests -v
+```
+
+只執行 CLI 測試：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s src/quant_flow/tests -p test_cli.py -v
+```
+
+測試位於 `src/quant_flow/tests`，不是專案根目錄的 `tests`。
+
+只驗證主程式的離線帳戶回測與報表輸出：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s src/quant_flow/tests -p test_main_account.py -v
+```
+
+目前共有 43 個測試，已涵蓋委託、成交、部位、資金檢查、股數計算、逐日模擬，以及離線主流程的報表與圖片輸出、成交現金核對和零成交匯出。
+
+### 目前回測假設
+
+- 單一股票、只做多、不放空。空手且目標為持有時，依可用現金計算包含成本後可買的整數股數；不足一股就略過。已持有且目標仍為持有時不加碼，目標為空手時全數賣出。
+- 前一筆資料收盤決定方向，當日開盤才決定股數、建立委託並模擬成交。委託與成交可有相同時間戳；這是以已知開盤價立即執行的日線簡化模型，並非真實市場保證可成交的價格。
+- 買入成交價為開盤價乘以 `1 + slippage_rate`，賣出為開盤價乘以 `1 - slippage_rate`。手續費為成交金額乘以 `fee_rate`；滑價已反映於價格，不會再扣一次。
+- 市價委託一次全部成交，尚未處理部分成交、流動性、委託狀態、重複成交防護、交易稅、最低手續費、費用取整與價格跳動單位。
+- 成交前檢查資金及可賣股數，帳戶更新亦保留檢查。現金與平均成本使用 `Decimal`；平均成本不含手續費，賣出部分持倉不改變剩餘部位的平均成本。
+- 基準同樣使用初始現金 `100000` 與整數股模型，從第二筆資料開盤嘗試買入；若當天不足一股，持有目標會在後續日期繼續嘗試。均線策略的暖機空手期包含在比較期間內。
+- 結束時不強制平倉，淨值估值至最後一筆開盤，回撤不包含盤中跌幅。
+- yfinance 使用未自動調整價格，尚未處理股息、拆股與交易日曆缺漏。
 
 ## 最終目標
 
@@ -18,6 +183,22 @@ Quant Flow 的目標是從 Python 量化研究與基礎回測開始，逐步建�
 | 績效與迭代層 | Python + FinLab | 記錄交易、損益與滑價，比較實盤與回測，回饋研究流程 |
 
 ## 系統架構
+
+目前主程式的 phase2 流程：
+
+```mermaid
+flowchart TD
+    DATA["yfinance / CSV"] --> NORMAL["驗證與排序"]
+    NORMAL --> MA["均線與收盤訊號"]
+    MA --> DAILY["逐日開盤：使用前一筆訊號"]
+    DAILY --> SIZE["依現金與成本決定股數"]
+    SIZE --> ORDER["Order：市價委託"]
+    ORDER --> CANDIDATE["計算候選 Fill：成交價與費用"]
+    CANDIDATE --> RISK["檢查資金與持倉"]
+    RISK --> ACCOUNT["更新 Portfolio / Position"]
+    ACCOUNT --> HISTORY["逐日帳戶與逐筆成交"]
+    HISTORY --> REPORT["績效、圖表、CSV 與設定檔"]
+```
 
 以下為預計建立的核心資料流。初期先使用 yfinance，後續再抽象化資料介面並加入 FinLab。
 
@@ -48,10 +229,12 @@ XQ 即時監控與券商交易串接會在 phase6 推進；此前先建立回測
 
 **工作項目：**
 
-- [ ] 取得並整理 yfinance 歷史價格資料。
-- [ ] 定義一個基礎策略及其輸入資料。
-- [ ] 根據策略規則產生交易訊號。
-- [ ] 將訊號接入基礎回測，輸出交易紀錄與回測結果。
+- [x] 取得並整理 yfinance 歷史價格資料。
+- [x] 定義一個基礎策略及其輸入資料。
+- [x] 根據策略規則產生交易訊號。
+- [x] 將訊號接入基礎回測，輸出交易紀錄與回測結果。
+
+基礎流程已跑通，phase2 也已補上逐筆成交紀錄。保存資料及參數可用於相同版本的重跑；跨模型版本的結果不保證相同。
 
 **完成條件：** 能以固定資料範圍與策略參數，重現從資料取得到回測結果的完整流程。
 
@@ -61,10 +244,12 @@ XQ 即時監控與券商交易串接會在 phase6 推進；此前先建立回測
 
 **工作項目：**
 
-- [ ] 建立投資組合管理，追蹤資金與部位配置。
-- [ ] 將交易訊號轉為委託，加入基本部位限制與風控規則。
-- [ ] 定義模擬成交規則，產生成交紀錄。
-- [ ] 依成交結果更新現金與持倉。
+- [x] 建立投資組合管理，追蹤資金與部位配置。
+- [x] 將交易訊號轉為委託，加入基本部位限制與風控規則。
+- [x] 定義模擬成交規則，產生成交紀錄。
+- [x] 依成交結果更新現金與持倉。
+
+上述項目已完成單一股票、只做多、一次全部成交的基礎版本；仍待加入可設定初始資金、模型相容性檢查，以及更完整的委託與成交管理。
 
 **完成條件：** 能串起訊號、委託、模擬成交及持倉更新，且資金與部位變化可由交易紀錄核對。
 
@@ -81,6 +266,8 @@ XQ 即時監控與券商交易串接會在 phase6 推進；此前先建立回測
 - [ ] 整理績效結果與研究紀錄，作為策略調整依據。
 
 **完成條件：** 能產出包含績效指標、基準比較與滑價假設的分析結果，並記錄前視偏誤的檢查方式及結果。
+
+目前已有累積報酬、MDD、買進持有比較、固定比例滑價與訊號時間對齊測試；Sharpe Ratio 與完整研究偏誤檢查尚未完成，因此不將本階段整體標記為完成。
 
 > 本階段集中進行研究驗證，但從 phase1 起就應注意資料時間順序，避免使用決策當下尚未取得的資訊。
 
@@ -128,55 +315,80 @@ XQ 即時監控與券商交易串接會在 phase6 推進；此前先建立回測
 
 ## 專案目錄
 
-Python 程式骨架位於 `src/quant_flow/`，依照資料、策略、訊號、投資組合與風控、委託、成交、持倉及績效分析分層。下圖註解說明各檔案預計承擔的職責，目前尚未加入程式內容。
+下圖省略套件內的 `__init__.py`，並標示尚待實作的模組。
 
 ```text
 quant-flow-docs/
-├── README.md                 # 專案介紹、系統架構與開發階段
-├── ultimate-goal.md          # 最終目標與六層系統規劃
-├── program-architecture.md   # 核心程式架構與資料流
-├── prompt.md                 # 開發階段原始規劃
+├── README.md
+├── pyproject.toml                 # 套件、相依項目與指令入口
+├── .gitignore
+├── ultimate-goal.md
+├── program-architecture.md
+├── prompt.md
 ├── docs/
-│   ├── git-flow.md           # Git Flow 分支說明
-│   └── flow.jpg              # Git Flow 分支流程圖
+│   ├── git-flow.md
+│   └── flow.jpg
+├── outputs/                      # 執行後產生，Git 忽略
 └── src/
     └── quant_flow/
-        ├── __init__.py
-        ├── main.py           # 主流程入口
+        ├── main.py               # 主流程
+        ├── cli.py                # 命令列與設定檔解析
         ├── data/
-        │   ├── __init__.py
-        │   ├── normalizer.py # 資料標準化
+        │   ├── normalizer.py     # 資料驗證與排序
         │   └── providers/
-        │       ├── __init__.py
-        │       ├── base.py   # 資料來源共用介面
-        │       ├── yahoo_finance.py # yfinance 資料來源
-        │       └── finlab.py # FinLab 資料來源
+        │       ├── base.py       # 待實作：共用介面
+        │       ├── yahoo_finance.py
+        │       ├── csv_provider.py
+        │       └── finlab.py     # 待實作
         ├── strategy/
-        │   ├── __init__.py
-        │   └── engine.py     # 策略引擎
+        │   └── moving_average.py
         ├── signals/
-        │   ├── __init__.py
-        │   └── signal.py     # 交易訊號
+        │   └── signal.py
+        ├── backtest/
+        │   ├── simulator.py         # phase1 向量化回測
+        │   ├── account_simulator.py # phase2 逐日帳戶回測
+        │   └── execution.py         # 單次開盤的目標持倉處理
+        ├── performance/
+        │   ├── metrics.py        # 報酬與共用回撤計算
+        │   └── benchmark.py      # phase1 基準；主流程改用帳戶模型
+        ├── reporting/
+        │   ├── exporter.py
+        │   ├── comparison.py
+        │   └── charts.py
         ├── portfolio/
-        │   ├── __init__.py
-        │   ├── portfolio.py  # 投資組合管理
-        │   └── risk.py       # 風險控制
+        │   ├── portfolio.py      # 現金、持倉與總資產
+        │   ├── risk.py           # 資金與持倉檢查
+        │   └── sizing.py         # 含成本的可買股數
         ├── orders/
-        │   ├── __init__.py
-        │   └── order.py      # 委託
+        │   ├── order.py          # 委託模型
+        │   └── executor.py       # 串接成交、風控與帳戶更新
         ├── fills/
-        │   ├── __init__.py
-        │   └── fill.py       # 成交
+        │   ├── fill.py           # 成交模型與現金變化
+        │   └── simulator.py      # 市價成交、滑價與手續費
         ├── positions/
-        │   ├── __init__.py
-        │   └── position.py   # 持倉
-        └── performance/
-            ├── __init__.py
-            └── metrics.py    # 績效指標
+        │   └── position.py       # 股數與平均成本
+        └── tests/
+            ├── test_account_simulator.py
+            ├── test_backtest.py
+            ├── test_benchmark.py
+            ├── test_cli.py
+            ├── test_csv_replay.py
+            ├── test_execution.py
+            ├── test_executor.py
+            ├── test_fill.py
+            ├── test_fill_simulator.py
+            ├── test_main_account.py
+            ├── test_metrics.py
+            ├── test_normalizer.py
+            ├── test_order.py
+            ├── test_portfolio.py
+            ├── test_position.py
+            └── test_sizing.py
 ```
 
 ## 相關文件
 
+- [程式解說（Java 開發者轉 Python）](./commentary.md)
 - [最終目標](./ultimate-goal.md)
 - [程式架構](./program-architecture.md)
 - [開發階段原始規劃](./prompt.md)
