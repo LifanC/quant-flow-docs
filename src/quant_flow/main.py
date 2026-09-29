@@ -10,6 +10,7 @@ from quant_flow.reporting.charts import save_equity_chart
 from quant_flow.reporting.guide import export_chinese_guide
 from quant_flow.cli import parse_args
 from quant_flow.data.csv_format import write_csv
+from quant_flow.data.symbols import stock_args
 
 from pathlib import Path
 from datetime import datetime
@@ -28,7 +29,7 @@ def main() -> None:
     output_root = Path(__file__).resolve().parents[2] / "outputs"
     batch_dir = output_root / f"{datetime.now():%Y-%m-%d_%H-%M-%S}_{uuid4().hex[:8]}"
     for stock_symbol in dict.fromkeys(args.symbol):
-        run_stock(args, stock_symbol, output_root=batch_dir)
+        run_stock(stock_args(args, stock_symbol), stock_symbol, output_root=batch_dir)
 
 
 def run_stock(args: Namespace, stock_symbol: str, *, prices=None, output_root=None) -> None:
