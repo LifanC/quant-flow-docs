@@ -8,6 +8,20 @@ from contextlib import redirect_stderr
 
 
 class CliTest(unittest.TestCase):
+    def test_symbols(self):
+        self.assertEqual(parse_args([]).symbol, ["2330.TW"])
+        self.assertEqual(parse_args(["--symbol", "0050.TW"]).symbol, ["0050.TW"])
+        args = parse_args(["--symbol", "2330.TW", "0050.TW", "--period", "2y"])
+        self.assertEqual(args.symbol, ["2330.TW", "0050.TW"])
+        self.assertEqual(args.period, "2y")
+
+    def test_multiple_symbols_reject_single_source(self):
+        for option in ("--input-csv", "--config"):
+            with self.subTest(option=option), redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as caught:
+                    parse_args(["--symbol", "2330.TW", "0050.TW", option, "source"])
+                self.assertEqual(caught.exception.code, 2)
+
     def test_config_loads_parameters_and_csv_path(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             run_dir = Path(temp_dir)
@@ -41,7 +55,7 @@ class CliTest(unittest.TestCase):
                 str(config_path),
             ])
 
-            self.assertEqual(args.symbol, "0050.TW")
+            self.assertEqual(args.symbol, ["0050.TW"])
             self.assertEqual(args.short_window, 10)
             self.assertEqual(args.long_window, 30)
             self.assertAlmostEqual(args.fee_rate, 0.002)

@@ -37,6 +37,14 @@ py -3.13 -m venv .venv
 .\.venv\Scripts\quant-flow.exe --symbol 0050.TW --period 2y --short-window 10 --long-window 30
 ```
 
+一次回測多檔股票，在 `--symbol` 後以空格分隔代碼：
+
+```powershell
+.\.venv\Scripts\quant-flow.exe --symbol 2330.TW 0050.TW 2317.TW --period 2y --short-window 10 --long-window 30
+```
+
+各股票共用期間、均線與費率設定，逐檔獨立回測，每檔使用初始資金 `100000`，分別輸出至 `outputs/` 下不同資料夾。未取得股價的股票會略過，繼續下一檔。可使用 `quant-flow-compare.exe` 彙整比較結果。`--input-csv` 與 `--config` 僅支援單檔股票，每檔輸出的 `config.json` 可各自重播。
+
 不計成本與加入成本的範例，可擇一執行：
 
 ```powershell

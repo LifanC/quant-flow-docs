@@ -14,10 +14,15 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import uuid4
 import json
+from argparse import Namespace
 
 def main() -> None:
     args = parse_args()
-    stock_symbol = args.symbol
+    for stock_symbol in args.symbol:
+        run_stock(args, stock_symbol)
+
+
+def run_stock(args: Namespace, stock_symbol: str) -> None:
 
     if args.input_csv is not None:
         print(f"讀取本機資料：{args.input_csv}")
@@ -27,7 +32,7 @@ def main() -> None:
         prices = get_prices(stock_symbol, period=args.period)
 
     if prices.empty:
-        print("沒有取得股價資料")
+        print(f"{stock_symbol}：沒有取得股價資料，略過")
         return
 
     prices = normalize_prices(prices)
@@ -129,7 +134,7 @@ def main() -> None:
     run_config = {
         "engine": "account_v1",
         "initial_cash": str(initial_cash),
-        "symbol": args.symbol,
+        "symbol": stock_symbol,
         "period": None if using_csv else args.period,
         "short_window": args.short_window,
         "long_window": args.long_window,
