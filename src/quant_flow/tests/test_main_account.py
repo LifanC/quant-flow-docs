@@ -12,9 +12,50 @@ import pandas as pd
 
 from quant_flow import main as main_module
 from quant_flow.reporting.exporter import export_trades
+from quant_flow.cli import parse_args
 
 
 class MainAccountTest(unittest.TestCase):
+    def test_multiple_stocks_export_separate_replayable_runs(self):
+        prices = pd.DataFrame(
+            {"Open": [100., 110., 120., 90., 80., 120.],
+             "Close": [100., 110., 120., 90., 80., 120.]},
+            index=pd.date_range("2026-01-05", periods=6, freq="B", tz="Asia/Taipei"),
+        )
+        args = parse_args([
+            "--symbol", "EMPTY", "2330.TW", "0050.TW",
+            "--short-window", "2", "--long-window", "3",
+        ])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            with (
+                patch.object(main_module, "parse_args", return_value=args),
+                patch.object(main_module, "__file__", str(root / "src/quant_flow/main.py")),
+                patch.object(main_module, "get_prices", side_effect=[pd.DataFrame(), prices, prices * 2]) as download,
+                redirect_stdout(io.StringIO()),
+            ):
+                main_module.main()
+            self.assertEqual(
+                [call.args[0] for call in download.call_args_list],
+                ["EMPTY", "2330.TW", "0050.TW"],
+            )
+            runs = list((root / "outputs").iterdir())
+            self.assertEqual(len(runs), 2)
+            symbols = set()
+            for run in runs:
+                config = json.loads((run / "config.json").read_text("utf-8"))
+                symbol = config["symbol"]
+                symbols.add(symbol)
+                self.assertEqual(config["initial_cash"], "100000")
+                trades = pd.read_csv(run / "benchmark_trades.csv")
+                self.assertEqual(set(trades["Symbol"]), {symbol})
+                replay = parse_args(["--config", str(run / "config.json")])
+                self.assertEqual(replay.symbol, [symbol])
+                saved = pd.read_csv(replay.input_csv)
+                self.assertEqual(saved["Open"].iloc[0], 100 if symbol == "2330.TW" else 200)
+                self.assertTrue((run / "equity.png").is_file())
+            self.assertEqual(symbols, {"2330.TW", "0050.TW"})
+
     def test_csv_run_exports_account_history_and_reconcilable_trades(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -30,7 +71,7 @@ class MainAccountTest(unittest.TestCase):
             )
             prices.to_csv(source, index_label="Date")
             args = Namespace(
-                symbol="2330.TW", input_csv=source, period="1y",
+                symbol=["2330.TW"], input_csv=source, period="1y",
                 short_window=2, long_window=3,
                 fee_rate=0.001, slippage_rate=0.001,
             )

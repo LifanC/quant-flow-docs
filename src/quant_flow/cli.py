@@ -9,7 +9,9 @@ def parse_args(
 
     parser.add_argument(
         "--symbol",
-        default="2330.TW",
+        nargs="+",
+        default=["2330.TW"],
+        help="一個或多個股票代碼，以空格分隔，逐檔獨立回測",
     )
 
     parser.add_argument(
@@ -58,6 +60,9 @@ def parse_args(
 
     args = parser.parse_args(argv)
 
+    if len(args.symbol) > 1 and (args.input_csv is not None or args.config is not None):
+        parser.error("--input-csv 與 --config 僅支援單檔股票")
+
     if args.config is not None:
         try:
             config_path = args.config.resolve()
@@ -66,7 +71,9 @@ def parse_args(
                 config_path.read_text(encoding="utf-8")
             )
 
-            args.symbol = config["symbol"]
+            if not isinstance(config["symbol"], str) or not config["symbol"].strip():
+                raise ValueError("設定檔的 symbol 必須是單一股票代碼")
+            args.symbol = [config["symbol"]]
             args.short_window = int(config["short_window"])
             args.long_window = int(config["long_window"])
             args.fee_rate = float(config["fee_rate"])
