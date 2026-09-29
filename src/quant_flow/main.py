@@ -16,17 +16,26 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import uuid4
 import json
+import re
 from argparse import Namespace
 
 def main() -> None:
     args = parse_args()
-    for stock_symbol in args.symbol:
-        run_stock(args, stock_symbol)
+    if getattr(args, "screen", None):
+        from quant_flow.screening import screen_symbols
+        screen_symbols(args, Path(__file__).resolve().parents[2] / "outputs", report_stock=run_stock)
+        return
+    output_root = Path(__file__).resolve().parents[2] / "outputs"
+    batch_dir = output_root / f"{datetime.now():%Y-%m-%d_%H-%M-%S}_{uuid4().hex[:8]}"
+    for stock_symbol in dict.fromkeys(args.symbol):
+        run_stock(args, stock_symbol, output_root=batch_dir)
 
 
-def run_stock(args: Namespace, stock_symbol: str) -> None:
+def run_stock(args: Namespace, stock_symbol: str, *, prices=None, output_root=None) -> None:
 
-    if args.input_csv is not None:
+    if prices is not None:
+        prices = prices.copy()
+    elif args.input_csv is not None:
         print(f"讀取本機資料：{args.input_csv}")
         prices = load_prices(args.input_csv)
     else:
@@ -102,10 +111,15 @@ def run_stock(args: Namespace, stock_symbol: str) -> None:
 
     project_root = Path(__file__).resolve().parents[2]
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_id = f"{timestamp}_{uuid4().hex[:8]}"
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    safe_symbol = re.sub(r"[^A-Za-z0-9._^-]", "_", stock_symbol)
+    run_id = f"{safe_symbol}_{timestamp}_{uuid4().hex[:8]}"
 
     output_dir = project_root / "outputs" / run_id
+    if output_root is not None:
+        output_dir = output_root / (safe_symbol.strip(".") or "stock")
+        if output_dir.exists():
+            output_dir = output_root / run_id
 
     export_reports(
         strategy=result,

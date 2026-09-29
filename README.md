@@ -1,5 +1,43 @@
 # Quant Flow
 
+## 從 Excel／CSV 自動選股
+
+編輯根目錄的 `watchlist.csv`，保留第一列 `symbol`，下面每列放一個股票代號。
+雙擊 `run-screen.cmd`，即可自動讀取清單、下載日線並選股，不必逐檔輸入代號。
+若根目錄有 `watchlist.xlsx`，雙擊入口會優先讀取 Excel；否則使用 `watchlist.csv`。
+首次使用請依下方步驟建立 `.venv` 並安裝相依套件；既有環境請重新執行
+`.\.venv\Scripts\python.exe -m pip install -e .`，安裝 Excel 所需的 openpyxl。
+
+預設條件為最新可取得日線的 **5 日均線高於 20 日均線**，不是只選當日交叉。
+輸出位於 `outputs/時間_識別碼/`：`selected.csv` 是入選名單，
+`screening.csv` 記錄全部股票的條件結果、資料日期與失敗原因。單檔失敗會繼續處理其他股票。
+清單欄名沿用「英文（中文）」格式。所有資料完整的股票，不論是否入選，都會使用同一份股價資料接著回測，
+各自在同次執行的 `outputs/時間_識別碼/股票代號/` 產生原有完整報表：中英文 CSV、`config.json`、
+`equity.png` 與中文說明；原有欄位與圖片格式保持不變。
+若個別股票的報表產生失敗，清單的 `report_error（報表錯誤）` 會記錄原因，其他股票仍繼續處理。
+這個入口執行選股，不會自動下單；使用的是資料來源最新可取得日線，盤中資料可能尚未收盤。
+
+清單支援 UTF-8 CSV 與 `.xlsx` 的第一個工作表。預設欄名 `symbol`；
+其他欄名可使用 `--symbol-column 股票代號`。空白列會略過，重複代號只處理一次。
+也接受原有的 `symbol（股票代碼）` 欄名，可直接將 `selected.csv` 當成下一次的股票清單。
+純數字代號預設加 `.TW`；上櫃股票請明確填入例如 `6488.TWO`。
+Excel 的代號欄請先設為「文字」，再輸入 `0050` 或完整代號 `0050.TW`，
+避免 Excel 已將前導零刪掉；程式不會猜測補回遺失的零。
+
+```powershell
+# Excel 清單，自動選出均線多頭股票
+.\.venv\Scripts\python.exe -m quant_flow.main --symbols-file watchlist.xlsx --screen trend
+
+# 最新一天剛發生黃金交叉，採 10 / 30 日均線
+.\.venv\Scripts\python.exe -m quant_flow.main --symbols-file watchlist.csv --screen cross --short-window 10 --long-window 30
+
+# 只讀取清單，沿用原有逐檔回測流程
+.\.venv\Scripts\python.exe -m quant_flow.main --symbols-file watchlist.csv
+```
+
+`--symbols-file` 不可同時搭配 `--symbol`；清單／選股模式不可搭配
+單檔股價 `--input-csv` 或回放設定 `--config`。股票清單與歷史股價 CSV 是不同用途。
+
 Quant Flow 的目標是從 Python 量化研究與基礎回測開始，逐步建立模擬交易、績效分析、台股策略研究，以及即時監控與交易執行流程。
 
 目前主程式已使用 phase2 帳戶回測（`account_v1`），串接資料驗證、均線訊號、委託、模擬成交、現金與整數股持倉管理。策略與買進持有基準採相同帳戶模型，並輸出逐日帳戶、逐筆成交、績效圖表及重跑設定。phase1 的向量化回測仍保留於專案內；下列開發階段同時保留長期規劃。
@@ -43,7 +81,7 @@ py -3.13 -m venv .venv
 .\.venv\Scripts\quant-flow.exe --symbol 2330.TW 0050.TW 2317.TW --period 2y --short-window 10 --long-window 30
 ```
 
-各股票共用期間、均線與費率設定，逐檔獨立回測，每檔使用初始資金 `100000`，分別輸出至 `outputs/` 下不同資料夾。未取得股價的股票會略過，繼續下一檔。可使用 `quant-flow-compare.exe` 彙整比較結果。`--input-csv` 與 `--config` 僅支援單檔股票，每檔輸出的 `config.json` 可各自重播。
+各股票共用期間、均線與費率設定，逐檔獨立回測，每檔使用初始資金 `100000`，集中輸出至同一次執行的 `outputs/時間_識別碼/`，其下再依股票代號分資料夾。未取得股價的股票會略過，繼續下一檔。可使用 `quant-flow-compare.exe` 彙整比較結果。`--input-csv` 與 `--config` 僅支援單檔股票，每檔輸出的 `config.json` 可各自重播。
 
 不計成本與加入成本的範例，可擇一執行：
 
@@ -92,7 +130,20 @@ py -3.13 -m venv .venv
 
 ### 報表與圖表
 
-每次回測建立 `outputs/<時間戳_識別碼>/`，終端機會顯示實際輸出路徑。
+每次執行建立一個 `outputs/<年-月-日_時-分-秒_識別碼>/`，使用電腦本地時間與 24 小時制，例如 `outputs/2026-09-29_15-00-00_a1b2c3d4/2330.TW/`。依資料夾名稱排序即可查看執行先後（同秒執行以識別碼區分）。股票報表放在其下的代號資料夾，同次選股總表也放在該次執行資料夾。多次執行分開保存，不覆寫歷史報表；彙整工具同時支援舊版與新版目錄。
+
+```text
+outputs/
+├── 歷史報表/                    # 本次整理移入的舊報表
+└── 2026-09-29_15-00-00_a1b2c3d4/ # 一次執行：15 時 00 分 00 秒
+    ├── 0050.TW/
+    ├── 00919.TW/
+    ├── 2409.TW/
+    ├── screening.csv           # 選股模式：全部股票結果
+    └── selected.csv            # 選股模式：入選清單
+```
+
+每個股票資料夾均保留以下完整報表。`歷史報表/` 是已整理的舊資料，新執行不會自動搬移歷史資料；彙整時也會讀取其中的報表。
 
 | 檔案 | 內容 |
 | --- | --- |

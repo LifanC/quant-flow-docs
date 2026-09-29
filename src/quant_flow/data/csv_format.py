@@ -20,6 +20,9 @@ TRANSLATIONS = {
     "strategy_return": "策略報酬率", "strategy_mdd": "策略最大回撤",
     "benchmark_return": "基準報酬率", "benchmark_mdd": "基準最大回撤",
     "return_difference": "報酬率差",
+    "selected": "是否入選", "status": "處理狀態", "date": "資料日期",
+    "close": "收盤價", "short_ma": "短期均線", "long_ma": "長期均線",
+    "rule": "選股條件", "reason": "原因", "report_error": "報表錯誤",
 }
 HEADERS = {key: f"{key}（{value}）" for key, value in TRANSLATIONS.items()}
 
