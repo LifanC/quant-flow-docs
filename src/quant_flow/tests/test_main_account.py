@@ -13,6 +13,9 @@ import pandas as pd
 from quant_flow import main as main_module
 from quant_flow.reporting.exporter import export_trades
 from quant_flow.cli import parse_args
+from quant_flow.data.csv_format import read_csv
+from quant_flow.data.providers.csv_provider import load_prices
+from quant_flow.reporting.comparison import collect_results
 
 
 class MainAccountTest(unittest.TestCase):
@@ -47,14 +50,16 @@ class MainAccountTest(unittest.TestCase):
                 symbol = config["symbol"]
                 symbols.add(symbol)
                 self.assertEqual(config["initial_cash"], "100000")
-                trades = pd.read_csv(run / "benchmark_trades.csv")
+                trades = read_csv(run / "benchmark_trades.csv")
                 self.assertEqual(set(trades["Symbol"]), {symbol})
                 replay = parse_args(["--config", str(run / "config.json")])
                 self.assertEqual(replay.symbol, [symbol])
-                saved = pd.read_csv(replay.input_csv)
+                saved = load_prices(replay.input_csv)
                 self.assertEqual(saved["Open"].iloc[0], 100 if symbol == "2330.TW" else 200)
                 self.assertTrue((run / "equity.png").is_file())
             self.assertEqual(symbols, {"2330.TW", "0050.TW"})
+            comparison = collect_results(root / "outputs")
+            self.assertEqual(set(comparison["symbol"]), symbols)
 
     def test_csv_run_exports_account_history_and_reconcilable_trades(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -107,8 +112,8 @@ class MainAccountTest(unittest.TestCase):
                 ("strategy.csv", "trades.csv"),
                 ("benchmark.csv", "benchmark_trades.csv"),
             ):
-                history = pd.read_csv(run_dir / history_name)
-                trades = pd.read_csv(run_dir / trades_name, dtype=str)
+                history = read_csv(run_dir / history_name)
+                trades = read_csv(run_dir / trades_name, dtype=str)
                 self.assertFalse(trades.empty)
                 cash_change = sum(
                     (Decimal(value) for value in trades["Cash_Change"]),
@@ -138,8 +143,10 @@ class MainAccountTest(unittest.TestCase):
             self.assertTrue(trades.empty)
             self.assertEqual(
                 trades.columns.tolist(),
-                ["Symbol", "Side", "Quantity", "Price", "Gross_Amount",
-                 "Fee", "Cash_Change", "Created_At", "Executed_At"],
+                ["Symbol（股票代碼）", "Side（買賣方向）", "Quantity（股數）",
+                 "Price（成交價）", "Gross_Amount（成交金額）", "Fee（手續費）",
+                 "Cash_Change（現金變動）", "Created_At（訂單建立時間）",
+                 "Executed_At（成交時間）"],
             )
 
 

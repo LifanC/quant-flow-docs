@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+from quant_flow.data.csv_format import read_csv, write_csv
 
 
 def collect_results(outputs_dir: Path) -> pd.DataFrame:
@@ -19,10 +20,9 @@ def collect_results(outputs_dir: Path) -> pd.DataFrame:
             config_path.read_text(encoding="utf-8")
         )
 
-        summary = pd.read_csv(
+        summary = read_csv(
             summary_path,
             index_col="Strategy",
-            encoding="utf-8-sig",
         )
 
         strategy = summary.loc["moving_average"]
@@ -68,11 +68,7 @@ def main() -> None:
 
     output_path = outputs_dir / "comparison.csv"
 
-    comparison.to_csv(
-        output_path,
-        index=False,
-        encoding="utf-8-sig",
-    )
+    write_csv(comparison, output_path)
 
     columns = [
         "run_id",

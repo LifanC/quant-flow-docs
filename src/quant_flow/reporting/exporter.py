@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from quant_flow.fills.fill import Fill
+from quant_flow.data.csv_format import write_csv
 
 def export_reports(
     strategy: pd.DataFrame,
@@ -13,16 +14,14 @@ def export_reports(
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    strategy.to_csv(
+    write_csv(strategy,
         output_dir / "strategy.csv",
         index_label="Date",
-        encoding="utf-8-sig",
     )
 
-    benchmark.to_csv(
+    write_csv(benchmark,
         output_dir / "benchmark.csv",
         index_label="Date",
-        encoding="utf-8-sig",
     )
 
     summary = pd.DataFrame(
@@ -30,10 +29,9 @@ def export_reports(
         index=["moving_average", "buy_and_hold"],
     )
 
-    summary.to_csv(
+    write_csv(summary,
         output_dir / "summary.csv",
         index_label="Strategy",
-        encoding="utf-8-sig",
     )
 
 
@@ -58,4 +56,4 @@ def export_trades(fills: list[Fill], output_path: Path) -> None:
     ]
     trades = pd.DataFrame(records, columns=columns)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    trades.to_csv(output_path, index=False, encoding="utf-8-sig")
+    write_csv(trades, output_path)
