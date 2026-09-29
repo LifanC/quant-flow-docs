@@ -8,7 +8,7 @@ from quant_flow.data.csv_format import read_csv, write_csv
 def collect_results(outputs_dir: Path) -> pd.DataFrame:
     records = []
 
-    for config_path in sorted(outputs_dir.glob("*/config.json")):
+    for config_path in sorted(outputs_dir.rglob("config.json")):
         run_dir = config_path.parent
         summary_path = run_dir / "summary.csv"
 
@@ -30,7 +30,7 @@ def collect_results(outputs_dir: Path) -> pd.DataFrame:
         data_info = config.get("data", {})
 
         records.append({
-            "run_id": run_dir.name,
+            "run_id": run_dir.relative_to(outputs_dir).as_posix(),
             "symbol": config["symbol"],
             "short_window": config["short_window"],
             "long_window": config["long_window"],
