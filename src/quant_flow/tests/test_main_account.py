@@ -19,6 +19,42 @@ from quant_flow.reporting.comparison import collect_results
 
 
 class MainAccountTest(unittest.TestCase):
+    def test_screen_exports_original_bilingual_reports_and_image(self):
+        prices = pd.DataFrame(
+            {"Open": [100., 110., 120., 130.], "Close": [100., 110., 120., 130.]},
+            index=pd.date_range("2026-01-05", periods=4, freq="B", tz="Asia/Taipei"),
+        )
+        args = parse_args(["--symbol", "2330.TW", "DOWN", "--screen", "trend",
+                           "--short-window", "1", "--long-window", "3"])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            with (
+                patch.object(main_module, "parse_args", return_value=args),
+                patch.object(main_module, "__file__", str(root / "src/quant_flow/main.py")),
+                patch("quant_flow.screening.get_prices", side_effect=[prices, prices.iloc[::-1].set_axis(prices.index)]),
+                patch.object(main_module, "get_prices") as redownload,
+                redirect_stdout(io.StringIO()),
+            ):
+                main_module.main()
+            redownload.assert_not_called()
+            runs = list((root / "outputs").iterdir())
+            self.assertEqual(len(runs), 1)
+            reports = [run for run in runs[0].iterdir() if run.is_dir()]
+            self.assertEqual({json.loads((run / "config.json").read_text("utf-8"))["symbol"]
+                              for run in reports}, {"2330.TW", "DOWN"})
+            for run in reports:
+                self.assertEqual((run / "equity.png").read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+                self.assertIn("Cash（現金）", pd.read_csv(run / "strategy.csv").columns)
+            report = reports[0]
+            selection = next(run for run in runs if (run / "selected.csv").exists())
+            self.assertEqual(read_csv(selection / "selected.csv").symbol.tolist(), ["2330.TW"])
+            self.assertIn("symbol（股票代碼）", pd.read_csv(selection / "selected.csv").columns)
+            self.assertIn("Cash（現金）", pd.read_csv(report / "strategy.csv").columns)
+            self.assertEqual((report / "equity.png").read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+            for name in ("benchmark.csv", "summary.csv", "trades.csv", "benchmark_trades.csv",
+                         "input_prices.csv", "中文說明.md"):
+                self.assertTrue((report / name).is_file(), name)
+
     def test_multiple_stocks_export_separate_replayable_runs(self):
         prices = pd.DataFrame(
             {"Open": [100., 110., 120., 90., 80., 120.],
@@ -42,12 +78,15 @@ class MainAccountTest(unittest.TestCase):
                 [call.args[0] for call in download.call_args_list],
                 ["EMPTY", "2330.TW", "0050.TW"],
             )
-            runs = list((root / "outputs").iterdir())
+            batches = list((root / "outputs").iterdir())
+            self.assertEqual(len(batches), 1)
+            runs = list(batches[0].iterdir())
             self.assertEqual(len(runs), 2)
             symbols = set()
             for run in runs:
                 config = json.loads((run / "config.json").read_text("utf-8"))
                 symbol = config["symbol"]
+                self.assertEqual(run.name, symbol)
                 symbols.add(symbol)
                 self.assertEqual(config["initial_cash"], "100000")
                 trades = read_csv(run / "benchmark_trades.csv")
@@ -95,7 +134,7 @@ class MainAccountTest(unittest.TestCase):
             download.assert_not_called()
             runs = list((root / "outputs").iterdir())
             self.assertEqual(len(runs), 1)
-            run_dir = runs[0]
+            run_dir = runs[0] / "2330.TW"
             for filename in (
                 "strategy.csv", "benchmark.csv", "summary.csv",
                 "trades.csv", "benchmark_trades.csv", "input_prices.csv",

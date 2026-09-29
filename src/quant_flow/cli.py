@@ -7,7 +7,11 @@ def parse_args(
 ) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--symbols-file", type=Path, help="從 CSV / XLSX 讀取股票清單")
+    parser.add_argument("--symbol-column", default="symbol", help="清單代號欄位名稱")
+    parser.add_argument("--screen", choices=["trend", "cross"], help="自動選股：均線多頭或黃金交叉")
+    source.add_argument(
         "--symbol",
         nargs="+",
         default=["2330.TW"],
@@ -59,6 +63,15 @@ def parse_args(
     )
 
     args = parser.parse_args(argv)
+
+    if (args.symbols_file is not None or args.screen) and (args.input_csv is not None or args.config is not None):
+        parser.error("股票清單／選股模式不可搭配 --input-csv 或 --config")
+    if args.symbols_file is not None:
+        from quant_flow.data.symbols import load_symbols
+        try:
+            args.symbol = load_symbols(args.symbols_file, args.symbol_column)
+        except (OSError, ValueError, ImportError) as exc:
+            parser.error(f"無法讀取股票清單：{exc}")
 
     if len(args.symbol) > 1 and (args.input_csv is not None or args.config is not None):
         parser.error("--input-csv 與 --config 僅支援單檔股票")
