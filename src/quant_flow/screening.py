@@ -9,6 +9,7 @@ from quant_flow.data.normalizer import normalize_prices
 from quant_flow.data.csv_format import write_csv
 from quant_flow.data.providers.yahoo_finance import get_prices
 from quant_flow.strategy.moving_average import calculate_signals
+from quant_flow.data.symbols import stock_args, PARAMETERS
 
 
 def screen_symbols(args, output_root: Path, report_stock=None) -> Path:
@@ -16,16 +17,18 @@ def screen_symbols(args, output_root: Path, report_stock=None) -> Path:
     output.mkdir(parents=True, exist_ok=False)
     rows = []
     for symbol in args.symbol:
+        effective = stock_args(args, symbol)
         print(f"選股分析：{symbol}")
         row = {"symbol": symbol, "selected": False, "status": "error",
                "date": "", "close": None, "short_ma": None, "long_ma": None,
                "rule": args.screen, "reason": "", "report_error": ""}
+        row.update({name: getattr(effective, name) for name in PARAMETERS})
         try:
-            prices = normalize_prices(get_prices(symbol, period=args.period))
-            required = args.long_window + (args.screen == "cross")
+            prices = normalize_prices(get_prices(symbol, period=effective.period))
+            required = effective.long_window + (args.screen == "cross")
             if len(prices) < required:
                 raise ValueError(f"資料不足：需要至少 {required} 筆")
-            signals = calculate_signals(prices, args.short_window, args.long_window)
+            signals = calculate_signals(prices, effective.short_window, effective.long_window)
             last = signals.iloc[-1]
             selected = bool(last["Signal"])
             if args.screen == "cross":
@@ -35,7 +38,7 @@ def screen_symbols(args, output_root: Path, report_stock=None) -> Path:
                        long_ma=last["SMA_Long"], reason="符合條件" if selected else "未符合條件")
             if report_stock is not None:
                 try:
-                    report_stock(args, symbol, prices=prices, output_root=output)
+                    report_stock(effective, symbol, prices=prices, output_root=output)
                 except Exception as exc:
                     row["report_error"] = str(exc)
                     print(f"{symbol}：報表產生失敗：{exc}")

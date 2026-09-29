@@ -67,9 +67,10 @@ def parse_args(
     if (args.symbols_file is not None or args.screen) and (args.input_csv is not None or args.config is not None):
         parser.error("股票清單／選股模式不可搭配 --input-csv 或 --config")
     if args.symbols_file is not None:
-        from quant_flow.data.symbols import load_symbols
+        from quant_flow.data.symbols import load_watchlist
         try:
-            args.symbol = load_symbols(args.symbols_file, args.symbol_column)
+            args.stock_options = load_watchlist(args.symbols_file, args.symbol_column)
+            args.symbol = list(args.stock_options)
         except (OSError, ValueError, ImportError) as exc:
             parser.error(f"無法讀取股票清單：{exc}")
 
@@ -105,16 +106,15 @@ def parse_args(
         except (OSError, ValueError, KeyError, TypeError) as exc:
             parser.error(f"無法載入設定檔：{exc}")
 
-    if not (
-        0 < args.short_window < args.long_window
-    ):
-        parser.error("均線週期必須符合：0 < 短均線 < 長均線")
-
-    if not (
-        0 <= args.fee_rate < 1
-        and 0 <= args.slippage_rate < 1
-        and args.fee_rate + args.slippage_rate < 1
-    ):
-        parser.error("費率必須非負，且合計小於 1")
+    from quant_flow.data.symbols import stock_args
+    for symbol in args.symbol:
+        effective = stock_args(args, symbol)
+        if effective.period is not None and effective.period not in ("1mo", "3mo", "6mo", "1y", "2y", "5y"):
+            parser.error(f"{symbol}：period 必須為 1mo、3mo、6mo、1y、2y 或 5y")
+        if not 0 < effective.short_window < effective.long_window:
+            parser.error(f"{symbol}：均線週期必須符合：0 < 短均線 < 長均線")
+        if not (0 <= effective.fee_rate < 1 and 0 <= effective.slippage_rate < 1
+                and effective.fee_rate + effective.slippage_rate < 1):
+            parser.error(f"{symbol}：費率必須非負，且合計小於 1")
 
     return args
