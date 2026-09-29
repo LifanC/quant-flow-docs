@@ -7,7 +7,9 @@ from quant_flow.performance.metrics import calculate_metrics
 from quant_flow.reporting.exporter import export_reports, export_trades
 from quant_flow.data.providers.csv_provider import load_prices
 from quant_flow.reporting.charts import save_equity_chart
+from quant_flow.reporting.guide import export_chinese_guide
 from quant_flow.cli import parse_args
+from quant_flow.data.csv_format import write_csv
 
 from pathlib import Path
 from datetime import datetime
@@ -123,10 +125,9 @@ def run_stock(args: Namespace, stock_symbol: str) -> None:
         output_path=output_dir / "equity.png",
     )
 
-    prices.to_csv(
+    write_csv(prices,
         output_dir / "input_prices.csv",
         index_label="Date",
-        encoding="utf-8-sig",
     )
 
     using_csv = args.input_csv is not None
@@ -165,6 +166,8 @@ def run_stock(args: Namespace, stock_symbol: str) -> None:
         ),
         encoding="utf-8",
     )
+
+    export_chinese_guide(output_dir)
 
     print(f"\n報表已輸出至：{output_dir}")
 

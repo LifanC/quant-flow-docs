@@ -4,6 +4,8 @@ import pandas as pd
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.ticker import PercentFormatter
+from matplotlib import font_manager
+from matplotlib.text import Text
 
 from quant_flow.performance.metrics import calculate_drawdown
 
@@ -24,8 +26,8 @@ def save_equity_chart(
     )
 
     datasets = [
-        ("Moving Average", strategy, "tab:blue"),
-        ("Buy and Hold", benchmark, "tab:orange"),
+        ("Moving Average（均線策略）", strategy, "tab:blue"),
+        ("Buy and Hold（買進持有）", benchmark, "tab:orange"),
     ]
 
     for label, data, color in datasets:
@@ -56,8 +58,8 @@ def save_equity_chart(
         linewidth=1,
     )
 
-    equity_axes.set_title(f"{stock_symbol} - Strategy Comparison")
-    equity_axes.set_ylabel("Equity (initial = 1.0)")
+    equity_axes.set_title(f"{stock_symbol} - Strategy Comparison（策略比較）")
+    equity_axes.set_ylabel("Equity（淨值）\ninitial（初始值）= 1.0")
     equity_axes.grid(True, alpha=0.3)
     equity_axes.legend()
 
@@ -68,12 +70,19 @@ def save_equity_chart(
         linewidth=1,
     )
 
-    drawdown_axes.set_xlabel("Date")
-    drawdown_axes.set_ylabel("Drawdown")
+    drawdown_axes.set_xlabel("Date（日期）")
+    drawdown_axes.set_ylabel("Drawdown（回撤）")
     drawdown_axes.yaxis.set_major_formatter(
         PercentFormatter(xmax=1.0)
     )
     drawdown_axes.grid(True, alpha=0.3)
+
+    available = {font.name for font in font_manager.fontManager.ttflist}
+    candidates = ["Microsoft JhengHei", "Noto Sans CJK TC", "PingFang TC",
+                  "Microsoft YaHei", "SimHei", "Arial Unicode MS"]
+    family = next((name for name in candidates if name in available), "sans-serif")
+    for label in figure.findobj(Text):
+        label.set_fontfamily([family, "DejaVu Sans"])
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=150)

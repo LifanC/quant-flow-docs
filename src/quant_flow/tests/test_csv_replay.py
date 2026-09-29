@@ -8,6 +8,7 @@ from quant_flow.backtest.simulator import run_backtest
 from quant_flow.data.normalizer import normalize_prices
 from quant_flow.data.providers.csv_provider import load_prices
 from quant_flow.strategy.moving_average import calculate_signals
+from quant_flow.data.csv_format import write_csv
 
 class CsvReplayTest(unittest.TestCase):
     def test_csv_replay_matches_original(self):
@@ -37,6 +38,14 @@ class CsvReplayTest(unittest.TestCase):
             )
 
             restored = normalize_prices(load_prices(csv_path))
+
+            write_csv(original, csv_path, index_label="Date")
+            self.assertEqual(
+                pd.read_csv(csv_path).columns.tolist(),
+                ["Date（日期）", "Open（開盤價）", "Close（收盤價）"],
+            )
+            bilingual = normalize_prices(load_prices(csv_path))
+            pd.testing.assert_frame_equal(restored, bilingual)
 
         original_result = self.run_strategy(original)
         restored_result = self.run_strategy(restored)
