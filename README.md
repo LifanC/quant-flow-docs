@@ -276,11 +276,11 @@ flowchart TD
     ACCOUNT --> REPORT["輸出帳戶、成交、績效與圖表"]
 ```
 
-### 後續開發方向
+### 開發進度與後續方向
 
 長期目標是串起「取得資料 → 研究策略 → 選股與交易訊號 → 風控與下單 → 分析結果 → 改善策略」。預計用 FinLab／其他來源取得價格、成交量、財報、營收、籌碼與因子資料，以 Python 做研究與策略管理，再接上 XQ 即時行情、警示及券商 API／人工下單。
 
-開發依 [prompt.md](./docs/prompt.md) 分成六個階段：
+開發分成六個階段。各階段的工作項目與完成條件統一維護於 [功能與開發路線圖](./FEATURES_ROADMAP.md)，[prompt.md](./docs/prompt.md) 保留原始規劃。以下提供進度概覽：
 
 | 階段 | 目標與完成條件 | 目前狀態 |
 | --- | --- | --- |
@@ -293,12 +293,6 @@ flowchart TD
 
 從一開始就要確認資料與訊號的時間順序，避免回測使用決策當下尚未取得的資訊（前視偏誤）。更完整的目標與架構見下方相關文件。
 
-### phase4：統一資料介面
-
-**目標：** 建立統一的 `DataProvider` 介面，讓策略透過一致的方式取得資料。
-
-先定義共用的資料格式與讀取方式，再讓 Yahoo 與 FinLab 資料來源遵循同一套規則。這樣更換資料來源時，策略與回測流程就能沿用。
-
 ### 專案目錄
 
 以下列出目前的文件、程式模組與測試檔案，並附上用途。各套件中的 `__init__.py` 僅作為套件識別，因此省略；`.venv/` 與 `outputs/` 是本機環境及執行產物。
@@ -306,6 +300,7 @@ flowchart TD
 ```text
 quant-flow-docs/
 ├── README.md                         # 使用說明
+├── FEATURES_ROADMAP.md               # 開發進度、待辦與完成條件
 ├── pyproject.toml                    # 相依套件、Python 版本與指令入口
 ├── .gitignore                        # Git 不追蹤的檔案與資料夾
 ├── watchlist.csv                     # 預設股票清單
@@ -384,6 +379,7 @@ quant-flow-docs/
 
 ## 相關文件
 
+- [功能與開發路線圖](./FEATURES_ROADMAP.md)
 - [程式解說（Java 開發者轉 Python）](./docs/commentary.md)
 - [最終目標](./docs/ultimate-goal.md)
 - [程式架構](./docs/program-architecture.md)
