@@ -15,11 +15,8 @@ def run_account_backtest(
     fee_rate: Decimal = Decimal("0"),
     slippage_rate: Decimal = Decimal("0"),
 ) -> tuple[pd.DataFrame, list[Fill]]:
-    if (
-        not isinstance(initial_cash, Decimal)
-        or not initial_cash.is_finite()
-        or initial_cash <= 0
-    ):
+    if (not isinstance(initial_cash, Decimal) or not initial_cash.is_finite()
+            or initial_cash <= 0):
         raise ValueError("初始現金必須是有限且大於零的 Decimal")
 
     data = normalize_prices(signals)
@@ -43,19 +40,13 @@ def run_account_backtest(
     for index in range(len(data)):
         row = data.iloc[index]
 
-        opened_at = (
-            data.index[index].normalize()
-            + pd.Timedelta(hours=9)
-        ).to_pydatetime()
+        opened_at = (data.index[index].normalize() +
+                     pd.Timedelta(hours=9)).to_pydatetime()
 
         open_price = Decimal(str(row["Open"]))
 
         # 第一筆資料之前沒有已知訊號，因此先空手。
-        target = (
-            int(data["Signal"].iloc[index - 1])
-            if index > 0
-            else 0
-        )
+        target = (int(data["Signal"].iloc[index - 1]) if index > 0 else 0)
 
         fill = execute_target_position(
             portfolio=portfolio,

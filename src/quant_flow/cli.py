@@ -2,15 +2,18 @@ import argparse
 from pathlib import Path
 import json
 
-def parse_args(
-    argv: list[str] | None = None,
-) -> argparse.Namespace:
+
+def parse_args(argv: list[str] | None = None, ) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     source = parser.add_mutually_exclusive_group()
-    source.add_argument("--symbols-file", type=Path, help="從 CSV / XLSX 讀取股票清單")
+    source.add_argument("--symbols-file",
+                        type=Path,
+                        help="從 CSV / XLSX 讀取股票清單")
     parser.add_argument("--symbol-column", default="symbol", help="清單代號欄位名稱")
-    parser.add_argument("--screen", choices=["trend", "cross"], help="自動選股：均線多頭或黃金交叉")
+    parser.add_argument("--screen",
+                        choices=["trend", "cross"],
+                        help="自動選股：均線多頭或黃金交叉")
     source.add_argument(
         "--symbol",
         nargs="+",
@@ -64,28 +67,31 @@ def parse_args(
 
     args = parser.parse_args(argv)
 
-    if (args.symbols_file is not None or args.screen) and (args.input_csv is not None or args.config is not None):
+    if (args.symbols_file is not None
+            or args.screen) and (args.input_csv is not None
+                                 or args.config is not None):
         parser.error("股票清單／選股模式不可搭配 --input-csv 或 --config")
     if args.symbols_file is not None:
         from quant_flow.data.symbols import load_watchlist
         try:
-            args.stock_options = load_watchlist(args.symbols_file, args.symbol_column)
+            args.stock_options = load_watchlist(args.symbols_file,
+                                                args.symbol_column)
             args.symbol = list(args.stock_options)
         except (OSError, ValueError, ImportError) as exc:
             parser.error(f"無法讀取股票清單：{exc}")
 
-    if len(args.symbol) > 1 and (args.input_csv is not None or args.config is not None):
+    if len(args.symbol) > 1 and (args.input_csv is not None
+                                 or args.config is not None):
         parser.error("--input-csv 與 --config 僅支援單檔股票")
 
     if args.config is not None:
         try:
             config_path = args.config.resolve()
 
-            config = json.loads(
-                config_path.read_text(encoding="utf-8")
-            )
+            config = json.loads(config_path.read_text(encoding="utf-8"))
 
-            if not isinstance(config["symbol"], str) or not config["symbol"].strip():
+            if not isinstance(config["symbol"],
+                              str) or not config["symbol"].strip():
                 raise ValueError("設定檔的 symbol 必須是單一股票代碼")
             args.symbol = [config["symbol"]]
             args.short_window = int(config["short_window"])
@@ -93,9 +99,7 @@ def parse_args(
             args.fee_rate = float(config["fee_rate"])
             args.slippage_rate = float(config["slippage_rate"])
 
-            args.input_csv = (
-                config_path.parent / config["data"]["file"]
-            )
+            args.input_csv = (config_path.parent / config["data"]["file"])
 
             # 使用保存的 CSV，不再使用相對期間下載。
             args.period = None
@@ -109,11 +113,13 @@ def parse_args(
     from quant_flow.data.symbols import stock_args
     for symbol in args.symbol:
         effective = stock_args(args, symbol)
-        if effective.period is not None and effective.period not in ("1mo", "3mo", "6mo", "1y", "2y", "5y"):
+        if effective.period is not None and effective.period not in (
+                "1mo", "3mo", "6mo", "1y", "2y", "5y"):
             parser.error(f"{symbol}：period 必須為 1mo、3mo、6mo、1y、2y 或 5y")
         if not 0 < effective.short_window < effective.long_window:
             parser.error(f"{symbol}：均線週期必須符合：0 < 短均線 < 長均線")
-        if not (0 <= effective.fee_rate < 1 and 0 <= effective.slippage_rate < 1
+        if not (0 <= effective.fee_rate < 1
+                and 0 <= effective.slippage_rate < 1
                 and effective.fee_rate + effective.slippage_rate < 1):
             parser.error(f"{symbol}：費率必須非負，且合計小於 1")
 
