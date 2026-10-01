@@ -6,9 +6,13 @@ import re
 import pandas as pd
 from quant_flow.data.csv_format import HEADERS
 
-
-PARAMETERS = {"period": str, "short_window": int, "long_window": int,
-              "fee_rate": float, "slippage_rate": float}
+PARAMETERS = {
+    "period": str,
+    "short_window": int,
+    "long_window": int,
+    "fee_rate": float,
+    "slippage_rate": float
+}
 
 
 def stock_args(args, symbol: str) -> Namespace:
@@ -21,9 +25,15 @@ def load_symbols(path: Path, column: str = "symbol") -> list[str]:
 
 def load_watchlist(path: Path, column: str = "symbol") -> dict[str, dict]:
     if path.suffix.lower() == ".csv":
-        frame = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
+        frame = pd.read_csv(path,
+                            dtype=str,
+                            keep_default_na=False,
+                            encoding="utf-8-sig")
     elif path.suffix.lower() == ".xlsx":
-        frame = pd.read_excel(path, dtype=str, keep_default_na=False, engine="openpyxl")
+        frame = pd.read_excel(path,
+                              dtype=str,
+                              keep_default_na=False,
+                              engine="openpyxl")
     else:
         raise ValueError("股票清單僅支援 .csv 或 .xlsx")
     frame.columns = frame.columns.str.strip()
@@ -46,13 +56,16 @@ def load_watchlist(path: Path, column: str = "symbol") -> dict[str, dict]:
         if symbol not in symbols:
             options = {}
             for name, convert in PARAMETERS.items():
-                field = name if name in frame.columns else HEADERS.get(name, name)
+                field = name if name in frame.columns else HEADERS.get(
+                    name, name)
                 raw = str(row.get(field, "")).strip()
                 if raw:
                     try:
                         options[name] = convert(raw)
                     except ValueError as exc:
-                        raise ValueError(f"第 {index + 2} 列 {symbol}：{name} 格式錯誤：{raw}") from exc
+                        raise ValueError(
+                            f"第 {index + 2} 列 {symbol}：{name} 格式錯誤：{raw}"
+                        ) from exc
             symbols[symbol] = options
     if not symbols:
         raise ValueError("股票清單沒有有效代號")

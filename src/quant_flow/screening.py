@@ -26,6 +26,7 @@ from argparse import Namespace
 
 import pandas as pd
 
+
 def screen_symbols(args, output_root: Path) -> Path:
     if getattr(args, "screen", None):
         output = output_root / f"{datetime.now():%Y-%m-%d_%H-%M-%S}_{uuid4().hex[:8]}"
@@ -34,12 +35,22 @@ def screen_symbols(args, output_root: Path) -> Path:
         for symbol in args.symbol:
             effective = stock_args(args, symbol)
             print(f"選股分析：{symbol}")
-            row = {"symbol": symbol, "selected": False, "status": "error",
-                "date": "", "close": None, "short_ma": None, "long_ma": None,
-                "rule": args.screen, "reason": "", "report_error": ""}
+            row = {
+                "symbol": symbol,
+                "selected": False,
+                "status": "error",
+                "date": "",
+                "close": None,
+                "short_ma": None,
+                "long_ma": None,
+                "rule": args.screen,
+                "reason": "",
+                "report_error": ""
+            }
             row.update({name: getattr(effective, name) for name in PARAMETERS})
             try:
-                prices = normalize_prices(get_prices(symbol, period=effective.period))
+                prices = normalize_prices(
+                    get_prices(symbol, period=effective.period))
                 required = effective.long_window + (args.screen == "cross")
                 if len(prices) < required:
                     raise ValueError(f"資料不足：需要至少 {required} 筆")
@@ -48,12 +59,19 @@ def screen_symbols(args, output_root: Path) -> Path:
                 selected = bool(last["Signal"])
                 if args.screen == "cross":
                     selected = selected and not bool(signals.iloc[-2]["Signal"])
-                row.update(selected=selected, status="ok", date=signals.index[-1].isoformat(),
-                        close=last["Close"], short_ma=last["SMA_Short"],
-                        long_ma=last["SMA_Long"], reason="符合條件" if selected else "未符合條件")
+                row.update(selected=selected,
+                           status="ok",
+                           date=signals.index[-1].isoformat(),
+                           close=last["Close"],
+                           short_ma=last["SMA_Short"],
+                           long_ma=last["SMA_Long"],
+                           reason="符合條件" if selected else "未符合條件")
                 if report_stock is not None:
                     try:
-                        report_stock(effective, symbol, prices=prices, output_root=output)
+                        report_stock(effective,
+                                     symbol,
+                                     prices=prices,
+                                     output_root=output)
                     except Exception as exc:
                         row["report_error"] = str(exc)
                         print(f"{symbol}：報表產生失敗：{exc}")
@@ -64,14 +82,21 @@ def screen_symbols(args, output_root: Path) -> Path:
         frame = pd.DataFrame(rows)
         write_csv(frame, output / "screening.csv")
         write_csv(frame.loc[frame["selected"]], output / "selected.csv")
-        print(f"選出 {int(frame['selected'].sum())} 檔；資料失敗 {int((frame['status'] == 'error').sum())} 檔；"
+        print(
+            f"選出 {int(frame['selected'].sum())} 檔；資料失敗 {int((frame['status'] == 'error').sum())} 檔；"
             f"報表失敗 {int(frame['report_error'].ne('').sum())} 檔。結果：{output}")
-        return output
     else:
         for stock_symbol in dict.fromkeys(args.symbol):
-            report_stock(stock_args(args, stock_symbol), stock_symbol, output_root=output)
+            report_stock(stock_args(args, stock_symbol),
+                         stock_symbol,
+                         output_root=output)
 
-def report_stock(args: Namespace, stock_symbol: str, *, prices=None, output_root=None) -> None:
+
+def report_stock(args: Namespace,
+                 stock_symbol: str,
+                 *,
+                 prices=None,
+                 output_root=None) -> None:
 
     if prices is not None:
         prices = prices.copy()
@@ -143,9 +168,8 @@ def report_stock(args: Namespace, stock_symbol: str, *, prices=None, output_root
     print(f"累積報酬：{benchmark_metrics['total_return']:.2%}")
     print(f"最大回撤：{benchmark_metrics['max_drawdown']:.2%}")
 
-    return_difference = (
-        strategy_metrics["total_return"] - benchmark_metrics["total_return"]
-    )
+    return_difference = (strategy_metrics["total_return"] -
+                         benchmark_metrics["total_return"])
 
     print(f"\n策略與基準報酬差：{return_difference * 100:.2f} 個百分點")
 
@@ -179,7 +203,8 @@ def report_stock(args: Namespace, stock_symbol: str, *, prices=None, output_root
         output_path=output_dir / "equity.png",
     )
 
-    write_csv(prices,
+    write_csv(
+        prices,
         output_dir / "input_prices.csv",
         index_label="Date",
     )
@@ -197,11 +222,8 @@ def report_stock(args: Namespace, stock_symbol: str, *, prices=None, output_root
         "slippage_rate": args.slippage_rate,
         "data": {
             "source": "csv" if using_csv else "yfinance",
-            "source_file": (
-                str(args.input_csv.resolve())
-                if using_csv
-                else None
-            ),
+            "source_file":
+            (str(args.input_csv.resolve()) if using_csv else None),
             "auto_adjust": None if using_csv else False,
             "file": "input_prices.csv",
             "rows": len(prices),

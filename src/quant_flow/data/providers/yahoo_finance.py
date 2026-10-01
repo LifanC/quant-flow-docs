@@ -1,6 +1,7 @@
 import pandas as pd
 import yfinance as yf
 
+
 def get_prices(
     stock_symbol: str,
     period: str = "1mo",
