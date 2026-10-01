@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def calculate_drawdown(equity: pd.Series) -> pd.Series:
     if equity.empty:
         raise ValueError("淨值資料不能為空")

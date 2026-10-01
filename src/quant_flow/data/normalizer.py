@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def normalize_prices(prices: pd.DataFrame) -> pd.DataFrame:
     if prices.empty:
         raise ValueError("股價資料不能為空")
@@ -7,9 +8,7 @@ def normalize_prices(prices: pd.DataFrame) -> pd.DataFrame:
     required_columns = ["Open", "Close"]
 
     missing_columns = [
-        column
-        for column in required_columns
-        if column not in prices.columns
+        column for column in required_columns if column not in prices.columns
     ]
 
     if missing_columns:

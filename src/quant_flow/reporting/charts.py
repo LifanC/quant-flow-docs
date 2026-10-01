@@ -9,6 +9,7 @@ from matplotlib.text import Text
 
 from quant_flow.performance.metrics import calculate_drawdown
 
+
 def save_equity_chart(
     strategy: pd.DataFrame,
     benchmark: pd.DataFrame,
@@ -72,15 +73,16 @@ def save_equity_chart(
 
     drawdown_axes.set_xlabel("Date（日期）")
     drawdown_axes.set_ylabel("Drawdown（回撤）")
-    drawdown_axes.yaxis.set_major_formatter(
-        PercentFormatter(xmax=1.0)
-    )
+    drawdown_axes.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
     drawdown_axes.grid(True, alpha=0.3)
 
     available = {font.name for font in font_manager.fontManager.ttflist}
-    candidates = ["Microsoft JhengHei", "Noto Sans CJK TC", "PingFang TC",
-                  "Microsoft YaHei", "SimHei", "Arial Unicode MS"]
-    family = next((name for name in candidates if name in available), "sans-serif")
+    candidates = [
+        "Microsoft JhengHei", "Noto Sans CJK TC", "PingFang TC",
+        "Microsoft YaHei", "SimHei", "Arial Unicode MS"
+    ]
+    family = next((name for name in candidates if name in available),
+                  "sans-serif")
     for label in figure.findobj(Text):
         label.set_fontfamily([family, "DejaVu Sans"])
 

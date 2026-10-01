@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def calculate_signals(
     prices: pd.DataFrame,
     short_window: int = 5,
@@ -10,20 +11,14 @@ def calculate_signals(
 
     result = prices.copy()
 
-    result["SMA_Short"] = (
-        result["Close"]
-        .rolling(window=short_window, min_periods=short_window)
-        .mean()
-    )
+    result["SMA_Short"] = (result["Close"]
+                           .rolling(window=short_window, min_periods=short_window)
+                           .mean())
 
-    result["SMA_Long"] = (
-        result["Close"]
-        .rolling(window=long_window, min_periods=long_window)
-        .mean()
-    )
+    result["SMA_Long"] = (result["Close"]
+                          .rolling(window=long_window, min_periods=long_window)
+                          .mean())
 
-    result["Signal"] = (
-        result["SMA_Short"] > result["SMA_Long"]
-    ).astype(int)
+    result["Signal"] = (result["SMA_Short"] > result["SMA_Long"]).astype(int)
 
     return result
