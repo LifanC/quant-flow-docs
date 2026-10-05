@@ -36,6 +36,10 @@ quantity = calculate_buy_quantity(account.cash, Decimal("100"))
 
 選股流程另從 `screening.py` 閱讀：`trend` 判斷最新均線多頭，`cross` 還要確認前一天不是多頭；各檔錯誤分別記錄。
 
+`main()` 使用模式對應表分派：`screen=None` 執行 `_run_batch`，`trend` 或 `cross` 執行 `_run_screen`。命令列解析器保證提供這個欄位，因此呼叫端自行建立 Namespace 時也需提供 `screen`。
+
+`run_stock()` 不受模式分派影響，仍可由選股流程或其他程式直接呼叫。`_load_stock_prices` 集中處理傳入資料、CSV 與 Yahoo 的來源優先順序，`_price_source_config` 集中建立報表來源設定；主回測流程只保留空資料提前返回的檢查。必要的來源與安全判斷仍保留在負責該工作的函式內。
+
 ## 重構內容與計算注意事項
 
 - `validation.py` 集中驗證 Decimal 型別、有限性與上下限；呼叫端仍提供原本的錯誤訊息。

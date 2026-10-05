@@ -23,9 +23,18 @@ def main() -> None:
     """解析設定並執行選股或逐檔回測；各股票使用獨立帳戶與報表目錄。"""
     args = parse_args()
     output_root = Path(__file__).resolve().parents[2] / "outputs"
-    if getattr(args, "screen", None):
-        screen_symbols(args, output_root, report_stock=run_stock)
-        return
+    # parse_args 保證 screen 為 None、trend 或 cross，直接選擇對應流程。
+    workflows = {None: _run_batch, "trend": _run_screen, "cross": _run_screen}
+    workflows[args.screen](args, output_root)
+
+
+def _run_screen(args: Namespace, output_root: Path) -> None:
+    """執行選股，並把共用的單檔回測函式交給選股流程產生報表。"""
+    screen_symbols(args, output_root, report_stock=run_stock)
+
+
+def _run_batch(args: Namespace, output_root: Path) -> None:
+    """建立同一批報表路徑，依清單順序對不重複股票逐檔回測。"""
     batch_dir = output_root / f"{datetime.now():%Y-%m-%d_%H-%M-%S}_{uuid4().hex[:8]}"
     for stock_symbol in dict.fromkeys(args.symbol):
         run_stock(stock_args(args, stock_symbol),
@@ -43,15 +52,7 @@ def run_stock(args: Namespace,
 
     prices 可由選股流程傳入，以重用下載資料；未提供時讀取 CSV 或 Yahoo。
     策略與買進持有使用相同初始資金、費率及股價，便於公平比較。"""
-    if prices is not None:
-        prices = prices.copy()
-    elif args.input_csv is not None:
-        print(f"讀取本機資料：{args.input_csv}")
-        prices = load_prices(args.input_csv)
-    else:
-        print(f"下載股價：{stock_symbol}")
-        prices = get_prices(stock_symbol, period=args.period)
-
+    prices = _load_stock_prices(args, stock_symbol, prices)
     if prices.empty:
         print(f"{stock_symbol}：沒有取得股價資料，略過")
         return
@@ -141,22 +142,19 @@ def run_stock(args: Namespace,
         index_label="Date",
     )
 
-    using_csv = args.input_csv is not None
+    source_config = _price_source_config(args)
 
     run_config = {
         "engine": "account_v1",
         "initial_cash": str(initial_cash),
         "symbol": stock_symbol,
-        "period": None if using_csv else args.period,
+        "period": source_config.pop("period"),
         "short_window": args.short_window,
         "long_window": args.long_window,
         "fee_rate": args.fee_rate,
         "slippage_rate": args.slippage_rate,
         "data": {
-            "source": "csv" if using_csv else "yfinance",
-            "source_file":
-            (str(args.input_csv.resolve()) if using_csv else None),
-            "auto_adjust": None if using_csv else False,
+            **source_config,
             "file": "input_prices.csv",
             "rows": len(prices),
             "first_timestamp": prices.index[0].isoformat(),
@@ -195,6 +193,42 @@ def _report_directory(stock_symbol: str, output_root: Path | None) -> Path:
             output_dir = output_root / run_id
 
     return output_dir
+
+
+def _load_stock_prices(args: Namespace, stock_symbol: str, prices):
+    """集中處理資料來源，優先使用傳入股價，再讀 CSV 或下載。
+
+    選股已下載的資料可直接重用；後續 normalize_prices 會建立副本，
+    因此這裡不必再複製一次，也不會修改呼叫端提供的 DataFrame。
+    """
+    if prices is not None:
+        return prices
+    if args.input_csv is not None:
+        print(f"讀取本機資料：{args.input_csv}")
+        return load_prices(args.input_csv)
+    print(f"下載股價：{stock_symbol}")
+    return get_prices(stock_symbol, period=args.period)
+
+
+def _price_source_config(args: Namespace) -> dict:
+    """一次建立來源設定，避免報表流程逐欄重複判斷 CSV 模式。
+
+    CSV 使用保存的固定資料，沒有下載期間或自動調整設定；
+    選股傳入的資料也沿用原本的 Yahoo 來源與下載期間。
+    """
+    if args.input_csv is not None:
+        return {
+            "period": None,
+            "source": "csv",
+            "source_file": str(args.input_csv.resolve()),
+            "auto_adjust": None,
+        }
+    return {
+        "period": args.period,
+        "source": "yfinance",
+        "source_file": None,
+        "auto_adjust": False,
+    }
 
 
 if __name__ == "__main__":
