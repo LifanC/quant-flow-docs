@@ -5,14 +5,17 @@ from uuid import uuid4
 
 import pandas as pd
 
-from quant_flow.data.normalizer import normalize_prices
-from quant_flow.data.csv_format import write_csv
-from quant_flow.data.providers.yahoo_finance import get_prices
-from quant_flow.strategy.moving_average import calculate_signals
-from quant_flow.data.symbols import stock_args, PARAMETERS
+from quant_flow.data import normalize_prices, stock_args, write_csv
+from quant_flow.data.providers import get_prices
+from quant_flow.strategy import calculate_signals
+from quant_flow.data.symbols import PARAMETERS
 
 
 def screen_symbols(args, output_root: Path, report_stock=None) -> Path:
+    """依最新日線篩選股票，回傳本批輸出目錄。
+
+    trend 判斷短均線高於長均線；cross 另外要求前一天尚未呈現多頭。
+    每檔資料或報表失敗各自記錄，讓其他股票仍可完成分析。"""
     output = output_root / f"{datetime.now():%Y-%m-%d_%H-%M-%S}_{uuid4().hex[:8]}"
     output.mkdir(parents=True, exist_ok=False)
     rows = []

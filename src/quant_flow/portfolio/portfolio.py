@@ -3,10 +3,12 @@ from decimal import Decimal
 
 from quant_flow.fills.fill import Fill
 from quant_flow.positions.position import Position
+from quant_flow.validation import validate_decimal
 
 
 @dataclass
 class Portfolio:
+    """可變帳戶，保存 Decimal 現金與各股票持倉；每個實例有獨立字典。"""
     cash: Decimal
     positions: dict[str, Position] = field(
         default_factory=dict,
@@ -14,14 +16,13 @@ class Portfolio:
     )
 
     def __post_init__(self) -> None:
-        if (
-            not isinstance(self.cash, Decimal)
-            or not self.cash.is_finite()
-            or self.cash < 0
-        ):
-            raise ValueError("現金必須是有限且非負的 Decimal")
+        """建立物件時檢查資料不變條件，避免無效值進入後續帳戶計算。"""
+        validate_decimal(
+            self.cash, "現金必須是有限且非負的 Decimal",
+        )
 
     def apply_fill(self, fill: Fill) -> None:
+        """計算新持倉與現金，全部驗證通過才更新，避免失敗時留下半套帳戶。"""
         symbol = fill.order.symbol
 
         current_position = self.positions.get(
@@ -44,6 +45,7 @@ class Portfolio:
         self,
         prices: dict[str, Decimal],
     ) -> Decimal:
+        """以提供的 Decimal 價格計算持股市值；零股部位不需報價。"""
         total = Decimal("0")
 
         for symbol, position in self.positions.items():
@@ -55,14 +57,9 @@ class Portfolio:
 
             price = prices[symbol]
 
-            if (
-                not isinstance(price, Decimal)
-                or not price.is_finite()
-                or price <= 0
-            ):
-                raise ValueError(
-                    f"{symbol} 的估值價格必須是有限且大於零的 Decimal"
-                )
+            validate_decimal(
+                price, f"{symbol} 的估值價格必須是有限且大於零的 Decimal", positive=True,
+            )
 
             total += price * position.quantity
 
@@ -72,4 +69,5 @@ class Portfolio:
         self,
         prices: dict[str, Decimal],
     ) -> Decimal:
+        """帳戶總資產等於可用現金加上全部持股市值。"""
         return self.cash + self.market_value(prices)

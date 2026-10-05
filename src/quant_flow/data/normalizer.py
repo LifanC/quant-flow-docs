@@ -2,6 +2,10 @@ import pandas as pd
 
 
 def normalize_prices(prices: pd.DataFrame) -> pd.DataFrame:
+    """驗證必要價格欄位及日期，回傳按日期排序的副本。
+
+    保留訊號等其他欄位；價格轉為 float，日期的時區由呼叫端處理。
+    拒絕重複日期、缺值、非正價格與無限大，避免回測默默使用壞資料。"""
     if prices.empty:
         raise ValueError("股價資料不能為空")
 

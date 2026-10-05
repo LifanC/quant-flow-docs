@@ -16,6 +16,7 @@ def execute_market_order(
     fee_rate: Decimal = Decimal("0"),
     slippage_rate: Decimal = Decimal("0"),
 ) -> Fill:
+    """先模擬成交與驗證資金／持股，成功後才一次更新帳戶並回傳成交。"""
     candidate_fill = simulate_market_order(
         order=order,
         open_price=open_price,

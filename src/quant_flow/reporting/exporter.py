@@ -13,6 +13,7 @@ def export_reports(
     benchmark_metrics: dict[str, float],
     output_dir: Path,
 ) -> None:
+    """建立目錄並輸出策略、基準逐日資料與績效摘要，使用雙語 CSV 欄名。"""
     output_dir.mkdir(parents=True, exist_ok=True)
 
     write_csv(
@@ -40,6 +41,7 @@ def export_reports(
 
 
 def export_trades(fills: list[Fill], output_path: Path) -> None:
+    """輸出成交明細；Decimal 轉字串保留精度，無交易時仍輸出完整表頭。"""
     columns = [
         "Symbol",
         "Side",
