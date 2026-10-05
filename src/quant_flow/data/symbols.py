@@ -16,14 +16,20 @@ PARAMETERS = {
 
 
 def stock_args(args, symbol: str) -> Namespace:
+    """建立股票專屬參數副本，將清單中的非空設定覆寫至全域參數。"""
     return Namespace(**(vars(args) | getattr(args, "stock_options", {}).get(symbol, {})))
 
 
 def load_symbols(path: Path, column: str = "symbol") -> list[str]:
+    """讀取清單並依首次出現順序回傳唯一代號。"""
     return list(load_watchlist(path, column))
 
 
 def load_watchlist(path: Path, column: str = "symbol") -> dict[str, dict]:
+    """讀取 CSV／Excel，回傳代號到個別參數的對應。
+
+    代號以字串讀取以保留前導零，純數字補上 .TW，重複代號採第一列。
+    空白參數不覆寫預設值；格式錯誤帶上原始檔案列號。"""
     if path.suffix.lower() == ".csv":
         frame = pd.read_csv(path,
                             dtype=str,

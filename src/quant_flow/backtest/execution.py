@@ -17,6 +17,10 @@ def execute_target_position(
     fee_rate: Decimal = Decimal("0"),
     slippage_rate: Decimal = Decimal("0"),
 ) -> Fill | None:
+    """將 0（空手）或 1（持有）的目標轉成一次市價委託。
+
+    已有持倉時不加碼；買入以可用現金計算最大整數股數，賣出則全數出清。
+    不需交易或資金不足一股時回傳 None；成交後由執行器更新帳戶。"""
     if type(target) is not int or target not in (0, 1):
         raise ValueError("目標持倉必須是整數 0 或 1")
 

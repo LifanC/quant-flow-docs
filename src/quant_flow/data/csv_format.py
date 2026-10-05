@@ -62,6 +62,9 @@ def write_csv(data: pd.DataFrame,
               path: Path,
               *,
               index_label: str | None = None) -> None:
+    """僅在檔案輸出邊界轉換雙語表頭；UTF-8 BOM 方便 Excel 顯示中文。
+
+    只有指定 index_label 才保存索引，避免清單意外多出流水號欄位。"""
     data.rename(columns=HEADERS).to_csv(
         path,
         index=index_label is not None,
@@ -74,6 +77,7 @@ def read_csv(path: Path,
              *,
              index_col: str | None = None,
              **kwargs) -> pd.DataFrame:
+    """讀取一般或雙語 CSV 並還原英文欄名，拒絕還原後的重複欄位。"""
     data = pd.read_csv(path, encoding="utf-8-sig", **kwargs)
     data = data.rename(columns={value: key for key, value in HEADERS.items()})
     if data.columns.duplicated().any():

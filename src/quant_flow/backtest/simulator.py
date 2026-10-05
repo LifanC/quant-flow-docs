@@ -5,6 +5,10 @@ def run_backtest(
     fee_rate: float = 0.0,
     slippage_rate: float = 0.0,
 ) -> pd.DataFrame:
+    """保留 phase1 的比例報酬模型，回傳含成本及累積淨值的資料副本。
+
+    前一天收盤訊號決定當天開盤持倉；開盤間報酬屬於前一期持倉。
+    換倉當天乘上成本折減，此模型不追蹤現金或整數股數。"""
     if fee_rate < 0 or slippage_rate < 0:
         raise ValueError("手續費率與滑價率不能小於零")
 

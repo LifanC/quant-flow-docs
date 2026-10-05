@@ -7,6 +7,7 @@ def validate_fill(
     portfolio: Portfolio,
     fill: Fill,
 ) -> None:
+    """檢查買入所需現金（含費用）或賣出可用股數，不修改帳戶。"""
     if fill.order.side == OrderSide.BUY:
         required_cash = -fill.cash_change
 

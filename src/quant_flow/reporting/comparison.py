@@ -6,6 +6,7 @@ from quant_flow.data.csv_format import read_csv, write_csv
 
 
 def collect_results(outputs_dir: Path) -> pd.DataFrame:
+    """遞迴讀取歷次設定與摘要，彙整策略／基準績效及原始資料期間。"""
     records = []
 
     for config_path in sorted(outputs_dir.rglob("config.json")):
@@ -53,6 +54,7 @@ def collect_results(outputs_dir: Path) -> pd.DataFrame:
 
 
 def main() -> None:
+    """彙整 outputs 內的回測，寫出 comparison.csv 並列印主要比較欄位。"""
     project_root = Path(__file__).resolve().parents[3]
     outputs_dir = project_root / "outputs"
 

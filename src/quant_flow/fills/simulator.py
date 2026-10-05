@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from quant_flow.fills.fill import Fill
 from quant_flow.orders.order import Order, OrderSide
+from quant_flow.validation import validate_decimal
 
 
 def simulate_market_order(
@@ -12,25 +13,19 @@ def simulate_market_order(
     fee_rate: Decimal = Decimal("0"),
     slippage_rate: Decimal = Decimal("0"),
 ) -> Fill:
-    if (
-        not isinstance(open_price, Decimal)
-        or not open_price.is_finite()
-        or open_price <= 0
-    ):
-        raise ValueError("開盤價必須是有限且大於零的 Decimal")
+    """按開盤價完整成交委託，回傳 Fill；不修改帳戶。
+
+    買方滑價提高成交價，賣方滑價降低成交價；手續費按成交總額計算。
+    成交時間需包含時區，且不得早於委託時間。"""
+    validate_decimal(
+        open_price, "開盤價必須是有限且大於零的 Decimal", positive=True,
+    )
 
     for name, rate in [
         ("手續費率", fee_rate),
         ("滑價率", slippage_rate),
     ]:
-        if (
-            not isinstance(rate, Decimal)
-            or not rate.is_finite()
-            or not Decimal("0") <= rate < Decimal("1")
-        ):
-            raise ValueError(
-                f"{name}必須是介於 0（含）到 1（不含）的 Decimal"
-            )
+        validate_decimal(rate, f"{name}必須是介於 0（含）到 1（不含）的 Decimal", below_one=True)
 
     if not isinstance(executed_at, datetime):
         raise ValueError("成交時間必須是 datetime")

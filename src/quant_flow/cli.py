@@ -4,6 +4,10 @@ import json
 
 
 def parse_args(argv: list[str] | None = None, ) -> argparse.Namespace:
+    """解析命令列、套用重播設定與個別股票覆寫，再驗證有效參數。
+
+    設定檔使用保存的股價 CSV；股票清單非空欄位優先於命令列預設值。
+    所有錯誤交由 argparse 顯示，避免無效設定進入下載或回測流程。"""
     parser = argparse.ArgumentParser()
 
     source = parser.add_mutually_exclusive_group()

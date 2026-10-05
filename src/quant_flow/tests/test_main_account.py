@@ -115,6 +115,7 @@ class MainAccountTest(unittest.TestCase):
             )
             prices.to_csv(source, index_label="Date")
             args = Namespace(
+                screen=None,
                 symbol=["2330.TW"], input_csv=source, period="1y",
                 short_window=2, long_window=3,
                 fee_rate=0.001, slippage_rate=0.001,

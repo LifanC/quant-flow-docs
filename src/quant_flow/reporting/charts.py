@@ -16,6 +16,9 @@ def save_equity_chart(
     stock_symbol: str,
     output_path: Path,
 ) -> None:
+    """輸出共用日期軸的淨值與回撤 PNG，選用可用中文字型。
+
+    使用 Agg 畫布，不需開啟視窗，也不修改 matplotlib 全域字型設定。"""
     figure = Figure(figsize=(10, 8), layout="constrained")
     FigureCanvasAgg(figure)
 

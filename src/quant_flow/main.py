@@ -1,16 +1,13 @@
-from quant_flow.backtest.account_simulator import run_account_backtest
-from quant_flow.data.providers.yahoo_finance import get_prices
-from quant_flow.signals.signal import generate_trade_events
-from quant_flow.strategy.moving_average import calculate_signals
-from quant_flow.data.normalizer import normalize_prices
-from quant_flow.performance.metrics import calculate_metrics
-from quant_flow.reporting.exporter import export_reports, export_trades
-from quant_flow.data.providers.csv_provider import load_prices
-from quant_flow.reporting.charts import save_equity_chart
-from quant_flow.reporting.guide import export_chinese_guide
+from quant_flow.backtest import run_account_backtest
+from quant_flow.data import normalize_prices, stock_args, write_csv
+from quant_flow.data.providers import get_prices, load_prices
+from quant_flow.signals import generate_trade_events
+from quant_flow.strategy import calculate_signals
+from quant_flow.performance import calculate_metrics
+from quant_flow.reporting import (
+    export_reports, export_trades, save_equity_chart, export_chinese_guide,
+)
 from quant_flow.cli import parse_args
-from quant_flow.data.csv_format import write_csv
-from quant_flow.data.symbols import stock_args
 from quant_flow.screening import screen_symbols
 
 from pathlib import Path
@@ -23,11 +20,21 @@ from argparse import Namespace
 
 
 def main() -> None:
+    """解析設定並執行選股或逐檔回測；各股票使用獨立帳戶與報表目錄。"""
     args = parse_args()
     output_root = Path(__file__).resolve().parents[2] / "outputs"
-    if getattr(args, "screen", None):
-        screen_symbols(args, output_root, report_stock=run_stock)
-        return
+    # parse_args 保證 screen 為 None、trend 或 cross，直接選擇對應流程。
+    workflows = {None: _run_batch, "trend": _run_screen, "cross": _run_screen}
+    workflows[args.screen](args, output_root)
+
+
+def _run_screen(args: Namespace, output_root: Path) -> None:
+    """執行選股，並把共用的單檔回測函式交給選股流程產生報表。"""
+    screen_symbols(args, output_root, report_stock=run_stock)
+
+
+def _run_batch(args: Namespace, output_root: Path) -> None:
+    """建立同一批報表路徑，依清單順序對不重複股票逐檔回測。"""
     batch_dir = output_root / f"{datetime.now():%Y-%m-%d_%H-%M-%S}_{uuid4().hex[:8]}"
     for stock_symbol in dict.fromkeys(args.symbol):
         run_stock(stock_args(args, stock_symbol),
@@ -41,15 +48,11 @@ def run_stock(args: Namespace,
               prices=None,
               output_root=None) -> None:
 
-    if prices is not None:
-        prices = prices.copy()
-    elif args.input_csv is not None:
-        print(f"讀取本機資料：{args.input_csv}")
-        prices = load_prices(args.input_csv)
-    else:
-        print(f"下載股價：{stock_symbol}")
-        prices = get_prices(stock_symbol, period=args.period)
+    """完成單檔股票的資料、策略、帳戶回測與報表流程。
 
+    prices 可由選股流程傳入，以重用下載資料；未提供時讀取 CSV 或 Yahoo。
+    策略與買進持有使用相同初始資金、費率及股價，便於公平比較。"""
+    prices = _load_stock_prices(args, stock_symbol, prices)
     if prices.empty:
         print(f"{stock_symbol}：沒有取得股價資料，略過")
         return
@@ -103,30 +106,17 @@ def run_stock(args: Namespace,
     strategy_metrics = calculate_metrics(result["Equity"])
     benchmark_metrics = calculate_metrics(benchmark["Equity"])
 
-    print("\n均線策略")
-    print(f"累積報酬：{strategy_metrics['total_return']:.2%}")
-    print(f"最大回撤：{strategy_metrics['max_drawdown']:.2%}")
-
-    print("\n買進持有")
-    print(f"累積報酬：{benchmark_metrics['total_return']:.2%}")
-    print(f"最大回撤：{benchmark_metrics['max_drawdown']:.2%}")
+    for label, metrics in [("均線策略", strategy_metrics), ("買進持有", benchmark_metrics)]:
+        print(f"\n{label}")
+        print(f"累積報酬：{metrics['total_return']:.2%}")
+        print(f"最大回撤：{metrics['max_drawdown']:.2%}")
 
     return_difference = (strategy_metrics["total_return"] -
                          benchmark_metrics["total_return"])
 
     print(f"\n策略與基準報酬差：{return_difference * 100:.2f} 個百分點")
 
-    project_root = Path(__file__).resolve().parents[2]
-
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    safe_symbol = re.sub(r"[^A-Za-z0-9._^-]", "_", stock_symbol)
-    run_id = f"{safe_symbol}_{timestamp}_{uuid4().hex[:8]}"
-
-    output_dir = project_root / "outputs" / run_id
-    if output_root is not None:
-        output_dir = output_root / (safe_symbol.strip(".") or "stock")
-        if output_dir.exists():
-            output_dir = output_root / run_id
+    output_dir = _report_directory(stock_symbol, output_root)
 
     export_reports(
         strategy=result,
@@ -152,22 +142,19 @@ def run_stock(args: Namespace,
         index_label="Date",
     )
 
-    using_csv = args.input_csv is not None
+    source_config = _price_source_config(args)
 
     run_config = {
         "engine": "account_v1",
         "initial_cash": str(initial_cash),
         "symbol": stock_symbol,
-        "period": None if using_csv else args.period,
+        "period": source_config.pop("period"),
         "short_window": args.short_window,
         "long_window": args.long_window,
         "fee_rate": args.fee_rate,
         "slippage_rate": args.slippage_rate,
         "data": {
-            "source": "csv" if using_csv else "yfinance",
-            "source_file":
-            (str(args.input_csv.resolve()) if using_csv else None),
-            "auto_adjust": None if using_csv else False,
+            **source_config,
             "file": "input_prices.csv",
             "rows": len(prices),
             "first_timestamp": prices.index[0].isoformat(),
@@ -189,6 +176,59 @@ def run_stock(args: Namespace,
     export_chinese_guide(output_dir)
 
     print(f"\n報表已輸出至：{output_dir}")
+
+
+def _report_directory(stock_symbol: str, output_root: Path | None) -> Path:
+    """產生報表路徑；批次內使用股票代號，遇到重複名稱才加時間與亂數。"""
+    project_root = Path(__file__).resolve().parents[2]
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    safe_symbol = re.sub(r"[^A-Za-z0-9._^-]", "_", stock_symbol)
+    run_id = f"{safe_symbol}_{timestamp}_{uuid4().hex[:8]}"
+
+    output_dir = project_root / "outputs" / run_id
+    if output_root is not None:
+        output_dir = output_root / (safe_symbol.strip(".") or "stock")
+        if output_dir.exists():
+            output_dir = output_root / run_id
+
+    return output_dir
+
+
+def _load_stock_prices(args: Namespace, stock_symbol: str, prices):
+    """集中處理資料來源，優先使用傳入股價，再讀 CSV 或下載。
+
+    選股已下載的資料可直接重用；後續 normalize_prices 會建立副本，
+    因此這裡不必再複製一次，也不會修改呼叫端提供的 DataFrame。
+    """
+    if prices is not None:
+        return prices
+    if args.input_csv is not None:
+        print(f"讀取本機資料：{args.input_csv}")
+        return load_prices(args.input_csv)
+    print(f"下載股價：{stock_symbol}")
+    return get_prices(stock_symbol, period=args.period)
+
+
+def _price_source_config(args: Namespace) -> dict:
+    """一次建立來源設定，避免報表流程逐欄重複判斷 CSV 模式。
+
+    CSV 使用保存的固定資料，沒有下載期間或自動調整設定；
+    選股傳入的資料也沿用原本的 Yahoo 來源與下載期間。
+    """
+    if args.input_csv is not None:
+        return {
+            "period": None,
+            "source": "csv",
+            "source_file": str(args.input_csv.resolve()),
+            "auto_adjust": None,
+        }
+    return {
+        "period": args.period,
+        "source": "yfinance",
+        "source_file": None,
+        "auto_adjust": False,
+    }
 
 
 if __name__ == "__main__":
